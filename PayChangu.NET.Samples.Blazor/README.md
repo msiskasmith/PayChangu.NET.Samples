@@ -4,7 +4,7 @@ A Blazor Web App demonstrating the [PayChangu.NET](https://www.nuget.org/package
 
 ## Requirements
 
-- .NET 10 SDK
+- .NET 11 SDK
 - A PayChangu API secret key to use the API-backed examples (the application can start without it)
 
 ## Configure the API key
