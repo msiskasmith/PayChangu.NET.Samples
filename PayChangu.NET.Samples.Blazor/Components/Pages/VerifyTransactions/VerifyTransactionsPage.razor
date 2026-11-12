@@ -11,20 +11,56 @@
         </RadzenText>
     </div>
     <RadzenCard>
-        <RadzenStack Gap="1rem">
-            <RadzenText>Enter the transaction details in the verification dialog. Checkout uses the merchant transaction reference; Direct Charge uses the PayChangu charge identifier.</RadzenText>
-            <RadzenButton Text="Verify transaction" Icon="search" Click="@OpenVerificationDialogAsync" />
-        </RadzenStack>
+        <RadzenTemplateForm TItem="VerificationRequest" Data="@request" Submit="@OpenVerificationDialogAsync">
+            <RadzenStack Gap="1rem">
+                <div>
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Transaction identifier</RadzenText>
+                    <RadzenTextBox Name="TransactionIdentifier" @bind-Value="request.TransactionIdentifier"
+                                   Placeholder="Checkout reference or Direct Charge ID" Style="width: 100%" />
+                    <RadzenRequiredValidator Component="TransactionIdentifier" Text="Enter a transaction reference or charge ID." />
+                </div>
+                <RadzenRow Gap="1rem">
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenText TextStyle="TextStyle.Subtitle2">Payment flow</RadzenText>
+                        <RadzenDropDown Name="PaymentFlow" TValue="PayChanguPaymentFlow" Data="@paymentFlows"
+                                        @bind-Value="request.PaymentFlow" Style="width: 100%" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenText TextStyle="TextStyle.Subtitle2">Payment method</RadzenText>
+                        <RadzenDropDown Name="PaymentMethod" TValue="PayChanguPaymentMethod" Data="@paymentMethods"
+                                        @bind-Value="request.PaymentMethod" Style="width: 100%" />
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenButton Text="Verify transaction" Icon="search" ButtonType="ButtonType.Submit" />
+            </RadzenStack>
+        </RadzenTemplateForm>
     </RadzenCard>
 </RadzenStack>
 
 @code {
     [Inject] private DialogService DialogService { get; set; } = default!;
 
-    private async Task OpenVerificationDialogAsync()
+    private readonly PayChanguPaymentFlow[] paymentFlows = [PayChanguPaymentFlow.Checkout, PayChanguPaymentFlow.DirectCharge];
+    private readonly PayChanguPaymentMethod[] paymentMethods = [PayChanguPaymentMethod.MobileMoney, PayChanguPaymentMethod.BankTransfer, PayChanguPaymentMethod.Card];
+    private readonly VerificationRequest request = new();
+
+    private async Task OpenVerificationDialogAsync(VerificationRequest model)
     {
         await DialogService.OpenAsync<VerifyTransactionDialog>(
             "Verify Transaction",
-            options: new DialogOptions { Width = "650px", CloseDialogOnOverlayClick = false });
+            new Dictionary<string, object?>
+            {
+                { nameof(VerifyTransactionDialog.TransactionIdentifier), model.TransactionIdentifier.Trim() },
+                { nameof(VerifyTransactionDialog.PaymentFlow), model.PaymentFlow },
+                { nameof(VerifyTransactionDialog.PaymentMethod), model.PaymentMethod }
+            },
+            new DialogOptions { Width = "650px", CloseDialogOnOverlayClick = false });
+    }
+
+    public sealed class VerificationRequest
+    {
+        public string TransactionIdentifier { get; set; } = string.Empty;
+        public PayChanguPaymentFlow PaymentFlow { get; set; } = PayChanguPaymentFlow.Checkout;
+        public PayChanguPaymentMethod PaymentMethod { get; set; } = PayChanguPaymentMethod.MobileMoney;
     }
 }
