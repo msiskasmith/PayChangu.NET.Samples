@@ -1,119 +1,41 @@
-@using Bogus
-
-<RadzenTemplateForm TItem="CheckoutForm" Data="@request" Submit="@InitiateCheckoutAsync">
-    <RadzenStack Gap="1rem">
-        <RadzenRow Gap="1rem">
-            <RadzenColumn Size="12" SizeMD="6">
-                <RadzenText TextStyle="TextStyle.Subtitle2">Amount</RadzenText>
-                <RadzenNumeric Name="Amount" TValue="decimal" @bind-Value="request.Amount" Min="1" Format="N2" Style="width: 100%" />
-                <RadzenNumericRangeValidator Component="Amount" Min="1" Text="Enter an amount greater than zero." />
-            </RadzenColumn>
-            <RadzenColumn Size="12" SizeMD="6">
-                <RadzenText TextStyle="TextStyle.Subtitle2">Currency</RadzenText>
-                <RadzenDropDown Name="Currency" TValue="PayChanguCurrency" Data="@currencies" @bind-Value="request.Currency" Style="width: 100%" />
-            </RadzenColumn>
-        </RadzenRow>
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem;">
-            <RadzenText TextStyle="TextStyle.Subtitle2">Customer details</RadzenText>
-            <RadzenButton Text="Refresh details" Icon="refresh" Size="ButtonSize.Small" ButtonType="ButtonType.Button" Click="@GenerateTestDetails" />
-        </div>
-        <RadzenRow Gap="1rem">
-            <RadzenColumn Size="12" SizeMD="6">
-                <RadzenTextBox Name="FirstName" @bind-Value="request.FirstName" Placeholder="First name" Style="width:100%" />
-                <RadzenRequiredValidator Component="FirstName" Text="Enter the customer's first name." />
-            </RadzenColumn>
-            <RadzenColumn Size="12" SizeMD="6">
-                <RadzenTextBox Name="LastName" @bind-Value="request.LastName" Placeholder="Last name" Style="width:100%" />
-                <RadzenRequiredValidator Component="LastName" Text="Enter the customer's last name." />
-            </RadzenColumn>
-            <RadzenColumn Size="12">
-                <RadzenTextBox Name="Email" @bind-Value="request.Email" Placeholder="Email address" Style="width:100%" />
-                <RadzenRequiredValidator Component="Email" Text="Enter the customer's email address." />
-                <RadzenEmailValidator Component="Email" Text="Enter a valid email address." />
-            </RadzenColumn>
-        </RadzenRow>
-        <RadzenText TextStyle="TextStyle.Subtitle2">Checkout URLs</RadzenText>
-        <RadzenTextBox Name="CallbackUrl" @bind-Value="request.CallbackUrl" Placeholder="Callback URL" Style="width:100%" />
-        <RadzenRequiredValidator Component="CallbackUrl" Text="Enter a callback URL." />
-        <RadzenTextBox Name="ReturnUrl" @bind-Value="request.ReturnUrl" Placeholder="Return URL" Style="width:100%" />
-        <RadzenRequiredValidator Component="ReturnUrl" Text="Enter a return URL." />
-        <RadzenText TextStyle="TextStyle.Caption">Use publicly accessible URLs belonging to your application. The checkout URL is returned after the session is created.</RadzenText>
-        <RadzenButton Text="Create checkout session" Icon="payments" ButtonType="ButtonType.Submit" Disabled="@isLoading" />
-        @if (isLoading)
-        {
-            <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" class="rz-p-4">
-                <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
-                <RadzenText>Creating checkout session with PayChangu...</RadzenText>
-            </RadzenStack>
-        }
-        @if (!string.IsNullOrWhiteSpace(errorMessage))
-        {
-            <RadzenAlert AlertStyle="AlertStyle.Danger">@errorMessage</RadzenAlert>
-        }
-        @if (!string.IsNullOrWhiteSpace(checkoutUrl))
-        {
-            <RadzenAlert AlertStyle="AlertStyle.Success">Checkout session created. The customer must complete payment on PayChangu.</RadzenAlert>
-            <RadzenText TextStyle="TextStyle.Subtitle2">Transaction reference</RadzenText>
-            <RadzenText TextStyle="TextStyle.Body2">@transactionReference</RadzenText>
-            <a href="@checkoutUrl" target="_blank" rel="noopener noreferrer">Open PayChangu checkout</a>
-        }
-        <RadzenButton Text="Close" ButtonStyle="ButtonStyle.Light" ButtonType="ButtonType.Button" Click="@Close" />
-    </RadzenStack>
-</RadzenTemplateForm>
+<RadzenStack Gap="1rem">
+    @if (isLoading)
+    {
+        <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" class="rz-p-4">
+            <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+            <RadzenText>Creating checkout session with PayChangu...</RadzenText>
+        </RadzenStack>
+    }
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger">@errorMessage</RadzenAlert>
+    }
+    @if (!string.IsNullOrWhiteSpace(checkoutUrl))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Success">Checkout session created. The customer must complete payment on PayChangu.</RadzenAlert>
+        <RadzenText TextStyle="TextStyle.Subtitle2">Transaction reference</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2">@transactionReference</RadzenText>
+        <a href="@checkoutUrl" target="_blank" rel="noopener noreferrer">Open PayChangu checkout</a>
+    }
+    <RadzenButton Text="Close" ButtonStyle="ButtonStyle.Light" Click="@Close" />
+</RadzenStack>
 
 @code {
+    [Parameter] public InitiateCheckoutRequest Request { get; set; } = default!;
+
     [Inject] private IPayChanguClient PayChanguClient { get; set; } = default!;
     [Inject] private DialogService DialogService { get; set; } = default!;
 
-    private readonly Faker faker = new();
-    private readonly PayChanguCurrency[] currencies = Enum.GetValues<PayChanguCurrency>();
-    private readonly CheckoutForm request = new()
-    {
-        Amount = 5000m,
-        Currency = PayChanguCurrency.MWK,
-        CallbackUrl = "https://example.com/payments/callback",
-        ReturnUrl = "https://example.com/payments/return"
-    };
     private string? checkoutUrl;
     private string? transactionReference;
     private string? errorMessage;
-    private bool isLoading;
+    private bool isLoading = true;
 
-    protected override void OnInitialized() => GenerateTestDetails();
-
-    private void GenerateTestDetails()
+    protected override async Task OnInitializedAsync()
     {
-        request.FirstName = faker.Name.FirstName();
-        request.LastName = faker.Name.LastName();
-        request.Email = faker.Internet.Email();
-    }
-
-    private async Task InitiateCheckoutAsync(CheckoutForm model)
-    {
-        checkoutUrl = null;
-        transactionReference = null;
-        errorMessage = null;
-        isLoading = true;
         try
         {
-            var reference = Guid.CreateVersion7().ToString();
-            var response = await PayChanguClient.Checkout.InitiateAsync(new InitiateCheckoutRequest
-            {
-                Amount = model.Amount,
-                Currency = model.Currency,
-                Email = model.Email.Trim(),
-                FirstName = model.FirstName.Trim(),
-                LastName = model.LastName.Trim(),
-                TransactionReference = reference,
-                CallbackUrl = model.CallbackUrl.Trim(),
-                ReturnUrl = model.ReturnUrl.Trim(),
-                Customization = new PaymentCustomization
-                {
-                    Title = "Sample payment",
-                    Description = "PayChangu.NET Blazor sample payment"
-                }
-            });
-
+            var response = await PayChanguClient.Checkout.InitiateAsync(Request);
             if (!response.Success || response.Result?.Data is not { } data)
             {
                 errorMessage = response.ErrorMessage ?? "PayChangu could not initiate the checkout session.";
@@ -134,15 +56,4 @@
     }
 
     private void Close() => DialogService.Close();
-
-    public sealed class CheckoutForm
-    {
-        public decimal Amount { get; set; }
-        public PayChanguCurrency Currency { get; set; }
-        public string FirstName { get; set; } = string.Empty;
-        public string LastName { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public string CallbackUrl { get; set; } = string.Empty;
-        public string ReturnUrl { get; set; } = string.Empty;
-    }
 }
