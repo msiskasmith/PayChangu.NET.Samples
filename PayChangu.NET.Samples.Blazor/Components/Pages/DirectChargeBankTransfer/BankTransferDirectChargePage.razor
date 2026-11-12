@@ -1,0 +1,108 @@
+@using Bogus
+
+@page "/direct-charge/bank-transfer"
+
+<PageTitle>Bank Transfer Direct Charge | PayChangu.NET Sample</PageTitle>
+
+<RadzenStack Gap="1rem" class="sample-page">
+    <div class="sample-page-header">
+        <RadzenText TextStyle="TextStyle.H4" TagName="TagName.H1">Direct Charge — Bank Transfer</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body1">
+            Initiate a bank transfer charge and display the returned payment instructions.
+        </RadzenText>
+    </div>
+
+    <RadzenCard>
+        <RadzenStack Gap="1rem">
+            <RadzenRow Gap="1rem">
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Amount</RadzenText>
+                    <RadzenNumeric TValue="decimal" @bind-Value="Request.Amount" Min="1" Format="N2" Style="width: 100%" />
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Currency</RadzenText>
+                    <RadzenDropDown TValue="PayChanguCurrency" Data="@currencies" @bind-Value="Request.Currency" Style="width: 100%" />
+                </RadzenColumn>
+            </RadzenRow>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+                <RadzenText TextStyle="TextStyle.Subtitle2">Customer details</RadzenText>
+                <RadzenButton Text="Refresh details" Icon="refresh" Size="ButtonSize.Small" Click="@GenerateTestDetails" />
+            </div>
+            <RadzenText TextStyle="TextStyle.Caption">Generated values are editable.</RadzenText>
+            <RadzenRow Gap="1rem">
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenTextBox @bind-Value="Request.Mobile" Placeholder="Mobile number" Style="width: 100%" />
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenTextBox @bind-Value="Request.Email" Placeholder="Email address (optional)" Style="width: 100%" />
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenTextBox @bind-Value="Request.FirstName" Placeholder="First name" Style="width: 100%" />
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenTextBox @bind-Value="Request.LastName" Placeholder="Last name" Style="width: 100%" />
+                </RadzenColumn>
+            </RadzenRow>
+            <div>
+                <RadzenCheckBox TValue="bool?" @bind-Value="Request.CreatePermanentAccount" />
+                <RadzenLabel Text="Request a permanent bank account" />
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Danger">@errorMessage</RadzenAlert>
+            }
+            <RadzenButton Text="Initiate bank transfer" Icon="account_balance" Click="@InitiateBankTransferAsync" />
+        </RadzenStack>
+    </RadzenCard>
+</RadzenStack>
+
+@code {
+    public InitiateBankTransferDirectChargeRequest Request { get; set; } = new();
+    [Inject] private DialogService _dialogService { get; set; } = default!;
+
+    private readonly Faker _faker = new();
+    private readonly PayChanguCurrency[] currencies = Enum.GetValues<PayChanguCurrency>();
+
+    private string? errorMessage;
+
+    protected override void OnInitialized()
+    {
+        GenerateTestDetails();
+    }
+
+    private void GenerateTestDetails()
+    {
+        Request.FirstName = _faker.Name.FirstName();
+        Request.LastName = _faker.Name.LastName();
+        Request.Email = _faker.Internet.Email();
+        Request.Mobile = _faker.Random.ReplaceNumbers("09########");
+    }
+
+    private async Task InitiateBankTransferAsync()
+    {
+        if (Request.Amount <= 0)
+        {
+            errorMessage = "Enter an amount greater than zero.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(Request.Mobile) ||
+            string.IsNullOrWhiteSpace(Request.FirstName) ||
+            string.IsNullOrWhiteSpace(Request.LastName))
+        {
+            errorMessage = "Complete the customer's mobile number, first name, and last name.";
+            return;
+        }
+
+        Request.ChargeId = Guid.CreateVersion7().ToString();
+
+        await _dialogService.OpenAsync<BankTransferDirectChargeDialog>("Initiate Bank Transfer Direct Charge", 
+                new Dictionary<string, object?>
+                {
+                    { nameof(BankTransferDirectChargeDialog.Request), Request }
+                }, new DialogOptions{ Height = "70%" });
+
+        GenerateTestDetails();
+    }
+}

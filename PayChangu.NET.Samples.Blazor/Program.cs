@@ -13,6 +13,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddRadzenComponents();
+builder.Services.AddScoped<DialogService>();
 builder.Services.AddSingleton<WebhookEventStore>();
 
 var secretKey = builder.Configuration["PayChangu:SecretKey"];
