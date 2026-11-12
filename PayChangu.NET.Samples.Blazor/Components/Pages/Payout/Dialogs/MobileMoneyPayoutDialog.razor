@@ -1,0 +1,67 @@
+@if (isLoading)
+{
+    <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" class="rz-p-4">
+        <RadzenText TextStyle="TextStyle.Body1">Sending payout request to PayChangu...</RadzenText>
+        <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+    </RadzenStack>
+}
+else if (!string.IsNullOrWhiteSpace(chargeId))
+{
+    <RadzenStack Gap="0.75rem">
+        @if (string.Equals(transactionStatus, "success", StringComparison.OrdinalIgnoreCase))
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Success">Payout initiated successfully. <a href="/wallet">Check your wallet balance</a>.</RadzenAlert>
+        }
+        else
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info">PayChangu processed the payout request. Check the current status below. <a href="/wallet">View wallet balance</a>.</RadzenAlert>
+        }
+        <RadzenText TextStyle="TextStyle.Subtitle2">Charge identifier</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2">@chargeId</RadzenText>
+        <RadzenText TextStyle="TextStyle.Subtitle2">Provider reference</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2">@providerReference</RadzenText>
+        <RadzenText TextStyle="TextStyle.Subtitle2">Status</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2">@transactionStatus</RadzenText>
+        <a href="/verify-transactions">Open Verify Transactions</a>
+    </RadzenStack>
+}
+else if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger">@errorMessage</RadzenAlert>
+}
+
+@code {
+    [Parameter] public InitiateMobileMoneyPayoutRequest Request { get; set; } = default!;
+    [Inject] IPayChanguClient payChanguClient { get; set; } = default!;
+
+    private string? chargeId;
+    private string? providerReference;
+    private string? transactionStatus;
+    private string? errorMessage;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var response = await payChanguClient.Payouts.MobileMoney.InitiateAsync(Request);
+            if (!response.Success || response.Result?.Data?.Transaction is not { } data)
+            {
+                errorMessage = response.ErrorMessage ?? "PayChangu could not initiate the Mobile Money payout.";
+                return;
+            }
+
+            chargeId = data.ChargeId;
+            providerReference = data.ReferenceId;
+            transactionStatus = data.Status;
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Unable to connect to PayChangu: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
