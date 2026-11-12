@@ -1,0 +1,72 @@
+@if (isLoading)
+{
+    <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" class="rz-p-4">
+        <RadzenText TextStyle="TextStyle.Body1">Sending card charge request to PayChangu...</RadzenText>
+        <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+    </RadzenStack>
+}
+else if (!string.IsNullOrWhiteSpace(cardAuthenticationUrl))
+{
+    <RadzenStack Gap="0.75rem">
+        <RadzenAlert AlertStyle="AlertStyle.Info">
+            Card charge initiated. The customer must complete 3-D Secure authentication before the payment can be verified.
+        </RadzenAlert>
+        <RadzenText TextStyle="TextStyle.Subtitle2">Charge identifier</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2">@chargeId</RadzenText>
+        <a href="@cardAuthenticationUrl">Continue to 3-D Secure authentication</a>
+        <RadzenText TextStyle="TextStyle.Caption">
+            After authentication, PayChangu returns the customer to the configured return URL. The return page verifies the transaction with PayChangu.
+        </RadzenText>
+        <a href="/direct-charge/card/refund?charge_id=@chargeId">Open Refund Card Charge</a>
+    </RadzenStack>
+}
+else if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger">@errorMessage</RadzenAlert>
+}
+
+@code {
+    [Parameter] public InitiateCardDirectChargeRequest Request { get; set; } = default!;
+    [Inject] IPayChanguClient payChanguClient { get; set; } = default!;
+
+    private string? chargeId;
+    private string? cardAuthenticationUrl;
+    private string? errorMessage;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var response = await payChanguClient.DirectCharges.Card.InitiateAsync(Request);
+            if (!response.Success || response.Result is not { Success: true } data)
+            {
+                errorMessage = response.ErrorMessage ??
+                    "PayChangu could not initiate the Card Direct Charge.";
+                return;
+            }
+
+            chargeId = Request.ChargeId;
+            if (!data.Requires3DSAuth || string.IsNullOrWhiteSpace(data.ThreeDSAuthLink))
+            {
+                errorMessage = "PayChangu did not return the expected 3-D Secure authentication link.";
+                chargeId = null;
+                return;
+            }
+
+            cardAuthenticationUrl = data.ThreeDSAuthLink;
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Unable to connect to PayChangu: {ex.Message}";
+        }
+        finally
+        {
+            // Do not retain card security details after the request has completed.
+            Request.CardNumber = string.Empty;
+            Request.Expiry = string.Empty;
+            Request.Cvv = string.Empty;
+            isLoading = false;
+        }
+    }
+}
