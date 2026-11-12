@@ -31,7 +31,7 @@
                 <RadzenDropDown Name="BankId" TValue="Guid" Data="@supportedBanks" TextProperty="Name" ValueProperty="Id"
                                 @bind-Value="Request.BankId" Placeholder="Select a bank or provider"
                                 Disabled="@isLoadingReferenceData" Style="width: 100%" />
-                <RadzenRequiredValidator Component="BankId" Text="Select a bank or payout provider." />
+                <RadzenRequiredValidator Component="BankId" DefaultValue="@Guid.Empty" Text="Select a bank or payout provider." />
                 @if (isLoadingReferenceData)
                 {
                     <RadzenText TextStyle="TextStyle.Caption">Loading supported banks...</RadzenText>
