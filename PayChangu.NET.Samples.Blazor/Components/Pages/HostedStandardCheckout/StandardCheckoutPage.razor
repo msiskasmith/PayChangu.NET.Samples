@@ -1,4 +1,5 @@
 @page "/standard-checkout"
+@using Bogus
 
 <PageTitle>Standard Checkout | PayChangu.NET Sample</PageTitle>
 
@@ -10,23 +11,106 @@
         </RadzenText>
     </div>
     <RadzenCard>
-        <RadzenStack Gap="1rem">
-            <RadzenText>
-                Configure the amount, customer details, and checkout URLs in the dialog. Once PayChangu creates the session,
-                you can open the hosted checkout page to complete the payment.
-            </RadzenText>
-            <RadzenButton Text="Initiate hosted checkout" Icon="payments" Click="@OpenCheckoutDialogAsync" />
-        </RadzenStack>
+        <RadzenTemplateForm TItem="CheckoutForm" Data="@request" Submit="@OpenCheckoutDialogAsync">
+            <RadzenStack Gap="1rem">
+                <RadzenRow Gap="1rem">
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenText TextStyle="TextStyle.Subtitle2">Amount</RadzenText>
+                        <RadzenNumeric Name="Amount" TValue="decimal" @bind-Value="request.Amount" Min="1" Format="N2" Style="width: 100%" />
+                        <RadzenNumericRangeValidator Component="Amount" Min="1" Text="Enter an amount greater than zero." />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenText TextStyle="TextStyle.Subtitle2">Currency</RadzenText>
+                        <RadzenDropDown Name="Currency" TValue="PayChanguCurrency" Data="@currencies" @bind-Value="request.Currency" Style="width: 100%" />
+                    </RadzenColumn>
+                </RadzenRow>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem;">
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Customer details</RadzenText>
+                    <RadzenButton Text="Refresh details" Icon="refresh" Size="ButtonSize.Small" ButtonType="ButtonType.Button" Click="@GenerateTestDetails" />
+                </div>
+                <RadzenRow Gap="1rem">
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenTextBox Name="FirstName" @bind-Value="request.FirstName" Placeholder="First name" Style="width:100%" />
+                        <RadzenRequiredValidator Component="FirstName" Text="Enter the customer's first name." />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenTextBox Name="LastName" @bind-Value="request.LastName" Placeholder="Last name" Style="width:100%" />
+                        <RadzenRequiredValidator Component="LastName" Text="Enter the customer's last name." />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12">
+                        <RadzenTextBox Name="Email" @bind-Value="request.Email" Placeholder="Email address" Style="width:100%" />
+                        <RadzenRequiredValidator Component="Email" Text="Enter the customer's email address." />
+                        <RadzenEmailValidator Component="Email" Text="Enter a valid email address." />
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenText TextStyle="TextStyle.Subtitle2">Checkout URLs</RadzenText>
+                <RadzenTextBox Name="CallbackUrl" @bind-Value="request.CallbackUrl" Placeholder="Callback URL" Style="width:100%" />
+                <RadzenRequiredValidator Component="CallbackUrl" Text="Enter a callback URL." />
+                <RadzenTextBox Name="ReturnUrl" @bind-Value="request.ReturnUrl" Placeholder="Return URL" Style="width:100%" />
+                <RadzenRequiredValidator Component="ReturnUrl" Text="Enter a return URL." />
+                <RadzenText TextStyle="TextStyle.Caption">Use publicly accessible URLs belonging to your application. The checkout URL is returned after the session is created.</RadzenText>
+                <RadzenButton Text="Create checkout session" Icon="payments" ButtonType="ButtonType.Submit" />
+            </RadzenStack>
+        </RadzenTemplateForm>
     </RadzenCard>
 </RadzenStack>
 
 @code {
     [Inject] private DialogService DialogService { get; set; } = default!;
 
-    private async Task OpenCheckoutDialogAsync()
+    private readonly Faker faker = new();
+    private readonly PayChanguCurrency[] currencies = Enum.GetValues<PayChanguCurrency>();
+    private readonly CheckoutForm request = new()
     {
+        Amount = 5000m,
+        Currency = PayChanguCurrency.MWK,
+        CallbackUrl = "https://example.com/payments/callback",
+        ReturnUrl = "https://example.com/payments/return"
+    };
+
+    protected override void OnInitialized() => GenerateTestDetails();
+
+    private void GenerateTestDetails()
+    {
+        request.FirstName = faker.Name.FirstName();
+        request.LastName = faker.Name.LastName();
+        request.Email = faker.Internet.Email();
+    }
+
+    private async Task OpenCheckoutDialogAsync(CheckoutForm model)
+    {
+        var transactionReference = Guid.CreateVersion7().ToString();
+        var checkoutRequest = new InitiateCheckoutRequest
+        {
+            Amount = model.Amount,
+            Currency = model.Currency,
+            Email = model.Email.Trim(),
+            FirstName = model.FirstName.Trim(),
+            LastName = model.LastName.Trim(),
+            TransactionReference = transactionReference,
+            CallbackUrl = model.CallbackUrl.Trim(),
+            ReturnUrl = model.ReturnUrl.Trim(),
+            Customization = new PaymentCustomization
+            {
+                Title = "Sample payment",
+                Description = "PayChangu.NET Blazor sample payment"
+            }
+        };
+
         await DialogService.OpenAsync<StandardCheckoutDialog>(
             "Initiate Hosted Checkout",
-            options: new DialogOptions { Width = "700px", CloseDialogOnOverlayClick = false });
+            new Dictionary<string, object?> { { nameof(StandardCheckoutDialog.Request), checkoutRequest } },
+            new DialogOptions { Width = "600px", CloseDialogOnOverlayClick = false });
+    }
+
+    public sealed class CheckoutForm
+    {
+        public decimal Amount { get; set; }
+        public PayChanguCurrency Currency { get; set; }
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string CallbackUrl { get; set; } = string.Empty;
+        public string ReturnUrl { get; set; } = string.Empty;
     }
 }
