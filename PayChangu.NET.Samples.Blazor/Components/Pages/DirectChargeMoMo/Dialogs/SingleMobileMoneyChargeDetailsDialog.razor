@@ -1,25 +1,18 @@
-<RadzenTemplateForm TItem="ChargeLookupRequest" Data="@request" Submit="@GetDetailsAsync">
-    <RadzenStack Gap="1rem">
-        <div>
-            <RadzenText TextStyle="TextStyle.Subtitle2">Charge identifier</RadzenText>
-            <RadzenTextBox Name="ChargeId" @bind-Value="request.ChargeId" Placeholder="Enter charge ID" Style="width: 100%" />
-            <RadzenRequiredValidator Component="ChargeId" Text="Enter a charge identifier." />
-        </div>
-        <RadzenButton Text="Get charge details" Icon="search" ButtonType="ButtonType.Submit" Disabled="@isLoading" />
-        @if (isLoading)
-        {
-            <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" class="rz-p-4">
-                <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
-                <RadzenText>Retrieving Mobile Money charge details...</RadzenText>
-            </RadzenStack>
-        }
-        @if (!string.IsNullOrWhiteSpace(errorMessage))
-        {
-            <RadzenAlert AlertStyle="AlertStyle.Danger">@errorMessage</RadzenAlert>
-        }
-        @if (transaction is not null)
-        {
-            <RadzenDivider />
+<RadzenStack Gap="1rem">
+    @if (isLoading)
+    {
+        <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" class="rz-p-4">
+            <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+            <RadzenText>Retrieving Mobile Money charge details...</RadzenText>
+        </RadzenStack>
+    }
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger">@errorMessage</RadzenAlert>
+    }
+    @if (transaction is not null)
+    {
+        <RadzenStack Gap="0.5rem">
             <RadzenText TextStyle="TextStyle.H6">Charge details</RadzenText>
             <RadzenText>Charge ID: @transaction.ChargeId</RadzenText>
             <RadzenText>Reference: @transaction.ReferenceId</RadzenText>
@@ -29,31 +22,26 @@
             <RadzenText>Operator: @(transaction.MobileMoney?.Name ?? "—")</RadzenText>
             <RadzenText>Created: @transaction.CreatedAt.ToLocalTime().ToString("g")</RadzenText>
             <RadzenText>Completed: @(transaction.CompletedAt?.ToLocalTime().ToString("g") ?? "Not completed")</RadzenText>
-        }
-        <RadzenButton Text="Close" ButtonStyle="ButtonStyle.Light" ButtonType="ButtonType.Button" Click="@Close" />
-    </RadzenStack>
-</RadzenTemplateForm>
+        </RadzenStack>
+    }
+    <RadzenButton Text="Close" ButtonStyle="ButtonStyle.Light" Click="@Close" />
+</RadzenStack>
 
 @code {
-    [Parameter] public string? InitialChargeId { get; set; }
+    [Parameter] public string ChargeId { get; set; } = string.Empty;
+
     [Inject] private IPayChanguClient PayChanguClient { get; set; } = default!;
     [Inject] private DialogService DialogService { get; set; } = default!;
 
-    private readonly ChargeLookupRequest request = new();
     private PayChanguTransaction? transaction;
     private string? errorMessage;
-    private bool isLoading;
+    private bool isLoading = true;
 
-    protected override void OnInitialized() => request.ChargeId = InitialChargeId ?? string.Empty;
-
-    private async Task GetDetailsAsync(ChargeLookupRequest model)
+    protected override async Task OnInitializedAsync()
     {
-        transaction = null;
-        errorMessage = null;
-        isLoading = true;
         try
         {
-            var response = await PayChanguClient.DirectCharges.MobileMoney.GetDetailsAsync(model.ChargeId.Trim());
+            var response = await PayChanguClient.DirectCharges.MobileMoney.GetDetailsAsync(ChargeId);
             if (!response.Success || response.Result?.Data is not { } data)
                 errorMessage = response.ErrorMessage ?? "Unable to retrieve Mobile Money charge details.";
             else
@@ -70,9 +58,4 @@
     }
 
     private void Close() => DialogService.Close();
-
-    public sealed class ChargeLookupRequest
-    {
-        public string ChargeId { get; set; } = string.Empty;
-    }
 }
