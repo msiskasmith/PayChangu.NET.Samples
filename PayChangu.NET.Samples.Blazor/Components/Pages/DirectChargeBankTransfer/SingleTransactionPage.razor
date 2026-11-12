@@ -40,7 +40,7 @@
 
     protected override void OnParametersSet()
     {
-        if (!string.IsNullOrWhiteSpace(ChargeId)) chargeId = ChargeId;
+        chargeId = ChargeId ?? string.Empty;
     }
 
     private async Task GetDetailsAsync()
