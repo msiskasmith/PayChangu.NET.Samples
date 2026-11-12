@@ -31,8 +31,9 @@
             <RadzenText TextStyle="TextStyle.Body1">Signature</RadzenText>
             <RadzenText TextStyle="TextStyle.Subtitle2">Response</RadzenText>
             <RadzenText TextStyle="TextStyle.Body1">
-                HTTP 200 when the signature and payload are valid; HTTP 401 for an invalid signature;
-                HTTP 400 for an invalid signed payload.
+                HTTP 200 when the event is accepted; HTTP 400 for an invalid signed payload or unsupported event;
+                HTTP 401 for an invalid signature; HTTP 502 when payment verification fails so PayChangu can retry;
+                HTTP 503 when the API key or webhook secret is not configured.
             </RadzenText>
         </RadzenStack>
     </RadzenCard>
