@@ -1,0 +1,61 @@
+<RadzenStack Gap="1rem">
+    @if (isLoading)
+    {
+        <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" class="rz-p-4">
+            <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+            <RadzenText>Retrieving Mobile Money charge details...</RadzenText>
+        </RadzenStack>
+    }
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger">@errorMessage</RadzenAlert>
+    }
+    @if (transaction is not null)
+    {
+        <RadzenStack Gap="0.5rem">
+            <RadzenText TextStyle="TextStyle.H6">Charge details</RadzenText>
+            <RadzenText>Charge ID: @transaction.ChargeId</RadzenText>
+            <RadzenText>Reference: @transaction.ReferenceId</RadzenText>
+            <RadzenText>Status: @transaction.Status</RadzenText>
+            <RadzenText>Amount: @transaction.Currency @transaction.Amount.ToString("N2")</RadzenText>
+            <RadzenText>Mobile: @(transaction.Mobile ?? "Not provided")</RadzenText>
+            <RadzenText>Operator: @(transaction.MobileMoney?.Name ?? "—")</RadzenText>
+            <RadzenText>Created: @transaction.CreatedAt.ToLocalTime().ToString("g")</RadzenText>
+            <RadzenText>Completed: @(transaction.CompletedAt?.ToLocalTime().ToString("g") ?? "Not completed")</RadzenText>
+        </RadzenStack>
+    }
+    <RadzenButton Text="Close" ButtonStyle="ButtonStyle.Light" Click="@Close" />
+</RadzenStack>
+
+@code {
+    [Parameter] public string ChargeId { get; set; } = string.Empty;
+
+    [Inject] private IPayChanguClient PayChanguClient { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
+
+    private PayChanguTransaction? transaction;
+    private string? errorMessage;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var response = await PayChanguClient.DirectCharges.MobileMoney.GetDetailsAsync(ChargeId);
+            if (!response.Success || response.Result?.Data is not { } data)
+                errorMessage = response.ErrorMessage ?? "Unable to retrieve Mobile Money charge details.";
+            else
+                transaction = data;
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Unable to retrieve charge details: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void Close() => DialogService.Close();
+}

@@ -1,0 +1,70 @@
+<RadzenStack Gap="1rem">
+    @if (isLoading)
+    {
+        <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" class="rz-p-4">
+            <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+            <RadzenText>Verifying transaction with PayChangu...</RadzenText>
+        </RadzenStack>
+    }
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger">@errorMessage</RadzenAlert>
+    }
+    @if (verification?.Result is { } data)
+    {
+        <RadzenStack Gap="0.5rem">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+                <RadzenText TextStyle="TextStyle.H6">Verification result</RadzenText>
+                <RadzenBadge Text="@data.Status" />
+            </RadzenStack>
+            <RadzenText>Amount: @data.Currency @data.Amount.ToString("N2")</RadzenText>
+            <RadzenText>Transaction identifier: @data.TransactionIdentifier</RadzenText>
+            <RadzenText>Provider reference: @(data.ProviderReference ?? "—")</RadzenText>
+            <RadzenText>Payment flow: @data.PaymentFlow</RadzenText>
+            <RadzenText>Payment method: @data.PaymentMethod</RadzenText>
+            <RadzenText>Environment: @(data.Mode ?? "—")</RadzenText>
+            <RadzenText>Created: @(data.CreatedAt?.ToLocalTime().ToString("g") ?? "—")</RadzenText>
+            <RadzenText>Completed: @(data.CompletedAt?.ToLocalTime().ToString("g") ?? "—")</RadzenText>
+            @if (data.Customer is not null)
+            {
+                <RadzenText>Customer: @($"{data.Customer.FirstName} {data.Customer.LastName}".Trim())</RadzenText>
+                <RadzenText>Email: @(data.Customer.Email ?? "—")</RadzenText>
+            }
+        </RadzenStack>
+    }
+    <RadzenButton Text="Close" ButtonStyle="ButtonStyle.Light" Click="@Close" />
+</RadzenStack>
+
+@code {
+    [Parameter] public string TransactionIdentifier { get; set; } = string.Empty;
+    [Parameter] public PayChanguPaymentFlow PaymentFlow { get; set; }
+    [Parameter] public PayChanguPaymentMethod PaymentMethod { get; set; }
+
+    [Inject] private IPayChanguClient PayChanguClient { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
+
+    private PayChanguApiResponse<VerifyPaymentResponse>? verification;
+    private string? errorMessage;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            verification = await PayChanguClient.Transactions.VerifyAsync(
+                TransactionIdentifier, PaymentFlow, PaymentMethod);
+            if (!verification.Success || verification.Result is null)
+                errorMessage = verification.ErrorMessage ?? "PayChangu could not verify the transaction.";
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Unable to connect to PayChangu: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void Close() => DialogService.Close();
+}

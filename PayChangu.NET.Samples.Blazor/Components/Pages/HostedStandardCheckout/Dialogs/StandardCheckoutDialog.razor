@@ -1,0 +1,59 @@
+<RadzenStack Gap="1rem">
+    @if (isLoading)
+    {
+        <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" class="rz-p-4">
+            <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+            <RadzenText>Creating checkout session with PayChangu...</RadzenText>
+        </RadzenStack>
+    }
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger">@errorMessage</RadzenAlert>
+    }
+    @if (!string.IsNullOrWhiteSpace(checkoutUrl))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Success">Checkout session created. The customer must complete payment on PayChangu.</RadzenAlert>
+        <RadzenText TextStyle="TextStyle.Subtitle2">Transaction reference</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2">@transactionReference</RadzenText>
+        <a href="@checkoutUrl" target="_blank" rel="noopener noreferrer">Open PayChangu checkout</a>
+    }
+    <RadzenButton Text="Close" ButtonStyle="ButtonStyle.Light" Click="@Close" />
+</RadzenStack>
+
+@code {
+    [Parameter] public InitiateCheckoutRequest Request { get; set; } = default!;
+
+    [Inject] private IPayChanguClient PayChanguClient { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
+
+    private string? checkoutUrl;
+    private string? transactionReference;
+    private string? errorMessage;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var response = await PayChanguClient.Checkout.InitiateAsync(Request);
+            if (!response.Success || response.Result?.Data is not { } data)
+            {
+                errorMessage = response.ErrorMessage ?? "PayChangu could not initiate the checkout session.";
+                return;
+            }
+
+            transactionReference = data.Session.TransactionReference;
+            checkoutUrl = data.CheckoutUrl;
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Unable to connect to PayChangu: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void Close() => DialogService.Close();
+}
