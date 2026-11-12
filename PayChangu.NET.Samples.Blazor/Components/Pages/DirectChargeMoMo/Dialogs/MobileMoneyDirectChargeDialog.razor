@@ -1,0 +1,65 @@
+@if (isLoading)
+{
+    <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" class="rz-p-4">
+        <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+        <RadzenText TextStyle="TextStyle.Body1">Sending payment request to PayChangu...</RadzenText>
+    </RadzenStack>
+}
+else if (!string.IsNullOrWhiteSpace(chargeId))
+{
+    <RadzenStack Gap="0.75rem">
+        <RadzenAlert AlertStyle="AlertStyle.Info">
+            The Direct Charge request was accepted. This does not mean the customer has completed payment.
+            Verify the transaction or process its webhook before fulfilling an order.
+        </RadzenAlert>
+        <RadzenText TextStyle="TextStyle.Subtitle2">Charge identifier</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2">@chargeId</RadzenText>
+        <RadzenText TextStyle="TextStyle.Subtitle2">Provider reference</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2">@providerReference</RadzenText>
+        <RadzenText TextStyle="TextStyle.Subtitle2">Current status</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2">@paymentStatus</RadzenText>
+        <a href="/direct-charge/mobile-money/details?charge_id=@chargeId">Open Single Charge Details</a>
+        <a href="/verify-transactions">Open Verify Transactions</a>
+    </RadzenStack>
+}
+else if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger">@errorMessage</RadzenAlert>
+}
+
+@code {
+    [Parameter] public InitiateMobileMoneyDirectChargeRequest Request { get; set; } = default!;
+    [Inject] IPayChanguClient payChanguClient { get; set; } = default!;
+
+    private string? chargeId;
+    private string? providerReference;
+    private string? paymentStatus;
+    private string? errorMessage;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var response = await payChanguClient.DirectCharges.MobileMoney.InitiateAsync(Request);
+            if (!response.Success || response.Result?.Data is not { } data)
+            {
+                errorMessage = response.ErrorMessage ??
+                    "PayChangu could not initiate the Mobile Money Direct Charge.";
+                return;
+            }
+
+            chargeId = data.ChargeId;
+            providerReference = data.ReferenceId;
+            paymentStatus = data.Status;
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Unable to connect to PayChangu: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

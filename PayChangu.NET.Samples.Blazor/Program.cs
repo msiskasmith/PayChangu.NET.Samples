@@ -89,7 +89,7 @@ app.MapPost("/api/webhooks/paychangu", async (
     if (webhookEvent.PaymentFlow is PayChanguPaymentFlow.Checkout or PayChanguPaymentFlow.DirectCharge)
     {
         var payChanguClient = context.RequestServices
-                .GetRequiredService<IPayChanguClient>();
+            .GetRequiredService<IPayChanguClient>();
 
         var verificationResponse = await payChanguClient.Transactions.VerifyAsync(
             webhookEvent.TransactionIdentifier,
@@ -97,15 +97,20 @@ app.MapPost("/api/webhooks/paychangu", async (
             webhookEvent.PaymentMethod,
             context.RequestAborted);
 
-        if (!verificationResponse.Success
-                || verificationResponse.Result is null
-                || !verificationResponse.Result
-                        .IsValid(webhookEvent.TransactionIdentifier, webhookEvent.Currency, webhookEvent.Amount))
+        if (!verificationResponse.Success ||
+            verificationResponse.Result is null ||
+            !verificationResponse.Result.IsValid(
+                webhookEvent.TransactionIdentifier,
+                webhookEvent.Currency,
+                webhookEvent.Amount))
         {
             // Return a server error so PayChangu can retry the webhook.
             return Results.StatusCode(StatusCodes.Status502BadGateway);
         }
 
+        paymentVerified = true;
+        verificationStatus = "Verified";
+        verificationMessage = "The payment was verified successfully against the PayChangu API.";
     }
     else if (webhookEvent.PaymentFlow == PayChanguPaymentFlow.Payout)
     {

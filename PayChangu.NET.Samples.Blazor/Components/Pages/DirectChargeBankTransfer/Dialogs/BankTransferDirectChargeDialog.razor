@@ -1,28 +1,30 @@
-﻿@if (isLoading)
+@if (isLoading)
 {
-    <RadzenCard><RadzenText TextStyle="TextStyle.Body2">Sending payment request to PayChangu...</RadzenText></RadzenCard>
+    <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" class="rz-p-4">
+        <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+        <RadzenText TextStyle="TextStyle.Body1">Sending payment request to PayChangu...</RadzenText>
+    </RadzenStack>
 }
 else if (!string.IsNullOrWhiteSpace(chargeId))
 {
-        <RadzenStack Gap="0.75rem">
-            <RadzenAlert AlertStyle="AlertStyle.Info">
-                The Direct Charge request was accepted. This does not mean the customer has completed payment.
-                Verify the transaction or process its webhook before fulfilling an order.
-            </RadzenAlert>
-            <RadzenText TextStyle="TextStyle.Subtitle2">Charge identifier</RadzenText>
-            <RadzenText TextStyle="TextStyle.Body2">@chargeId</RadzenText>
-            <RadzenText TextStyle="TextStyle.Subtitle2">Provider reference</RadzenText>
-            <RadzenText TextStyle="TextStyle.Body2">@providerReference</RadzenText>
-            <RadzenText TextStyle="TextStyle.Subtitle2">Current status</RadzenText>
-            <RadzenText TextStyle="TextStyle.Body2">@paymentStatus</RadzenText>
-            <RadzenText TextStyle="TextStyle.Subtitle2">Payment instructions</RadzenText>
-            <RadzenText TextStyle="TextStyle.Body2">@paymentInstructions</RadzenText>
-            <a href="/direct-charge/bank-transfer/details?charge_id=@chargeId">Open Single Transaction</a>
-            <a href="/verify-transactions">Open Verify Transactions</a>
-        </RadzenStack>
+    <RadzenStack Gap="0.75rem">
+        <RadzenAlert AlertStyle="AlertStyle.Info">
+            The Direct Charge request was accepted. This does not mean the customer has completed payment.
+            Verify the transaction or process its webhook before fulfilling an order.
+        </RadzenAlert>
+        <RadzenText TextStyle="TextStyle.Subtitle2">Charge identifier</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2">@chargeId</RadzenText>
+        <RadzenText TextStyle="TextStyle.Subtitle2">Provider reference</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2">@providerReference</RadzenText>
+        <RadzenText TextStyle="TextStyle.Subtitle2">Current status</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2">@paymentStatus</RadzenText>
+        <RadzenText TextStyle="TextStyle.Subtitle2">Payment instructions</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2">@paymentInstructions</RadzenText>
+        <a href="/direct-charge/bank-transfer/details?charge_id=@chargeId">Open Single Transaction</a>
+        <a href="/verify-transactions">Open Verify Transactions</a>
+    </RadzenStack>
 }
-
-@if (!string.IsNullOrWhiteSpace(errorMessage))
+else if (!string.IsNullOrWhiteSpace(errorMessage))
 {
     <RadzenAlert AlertStyle="AlertStyle.Danger">@errorMessage</RadzenAlert>
 }
@@ -31,8 +33,6 @@ else if (!string.IsNullOrWhiteSpace(chargeId))
     [Parameter] public InitiateBankTransferDirectChargeRequest Request { get; set; } = default!;
 
     [Inject] IPayChanguClient payChanguClient { get; set; } = default!;
-
-    private readonly PayChanguCurrency[] currencies = Enum.GetValues<PayChanguCurrency>();
 
     private string? chargeId;
     private string? providerReference;
@@ -48,22 +48,14 @@ else if (!string.IsNullOrWhiteSpace(chargeId))
 
     private async Task InitiateBankTransferAsync()
     {
-        errorMessage = null;
-        chargeId = null;
-        providerReference = null;
-        paymentStatus = null;
-        paymentInstructions = null;
-
         try
         {
-            var id = Guid.NewGuid().ToString();
-            var response = await payChanguClient.DirectCharges
-            .BankTransfer
-            .InitiateAsync(Request);
+            var response = await payChanguClient.DirectCharges.BankTransfer.InitiateAsync(Request);
 
             if (!response.Success || response.Result?.Data is not { } data)
             {
-                errorMessage = response.ErrorMessage ?? "PayChangu could not initiate the Bank Transfer Direct Charge.";
+                errorMessage = response.ErrorMessage ??
+                    "PayChangu could not initiate the Bank Transfer Direct Charge.";
                 return;
             }
 
