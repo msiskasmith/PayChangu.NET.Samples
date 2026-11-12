@@ -10,10 +10,16 @@
         </RadzenText>
     </div>
     <RadzenCard>
-        <RadzenStack Gap="1rem">
-            <RadzenText>Retrieve a single Mobile Money charge from PayChangu. The charge identifier can be prefilled from the URL using the charge_id query parameter.</RadzenText>
-            <RadzenButton Text="Get charge details" Icon="search" Click="@OpenDetailsDialogAsync" />
-        </RadzenStack>
+        <RadzenTemplateForm TItem="ChargeLookupRequest" Data="@request" Submit="@OpenDetailsDialogAsync">
+            <RadzenStack Gap="1rem">
+                <div>
+                    <RadzenText TextStyle="TextStyle.Subtitle2">Charge identifier</RadzenText>
+                    <RadzenTextBox Name="ChargeId" @bind-Value="request.ChargeId" Placeholder="Enter charge ID" Style="width: 100%" />
+                    <RadzenRequiredValidator Component="ChargeId" Text="Enter a charge identifier." />
+                </div>
+                <RadzenButton Text="Get charge details" Icon="search" ButtonType="ButtonType.Submit" />
+            </RadzenStack>
+        </RadzenTemplateForm>
     </RadzenCard>
 </RadzenStack>
 
@@ -23,11 +29,20 @@
     [SupplyParameterFromQuery(Name = "charge_id")]
     public string? ChargeId { get; set; }
 
-    private async Task OpenDetailsDialogAsync()
+    private readonly ChargeLookupRequest request = new();
+
+    protected override void OnParametersSet() => request.ChargeId = ChargeId ?? string.Empty;
+
+    private async Task OpenDetailsDialogAsync(ChargeLookupRequest model)
     {
         await DialogService.OpenAsync<SingleMobileMoneyChargeDetailsDialog>(
             "Single Mobile Money Charge Details",
-            new Dictionary<string, object?> { { nameof(SingleMobileMoneyChargeDetailsDialog.InitialChargeId), ChargeId } },
+            new Dictionary<string, object?> { { nameof(SingleMobileMoneyChargeDetailsDialog.ChargeId), model.ChargeId.Trim() } },
             new DialogOptions { Width = "600px", CloseDialogOnOverlayClick = false });
+    }
+
+    public sealed class ChargeLookupRequest
+    {
+        public string ChargeId { get; set; } = string.Empty;
     }
 }
