@@ -1,0 +1,107 @@
+<RadzenTemplateForm TItem="VerificationRequest" Data="@request" Submit="@VerifyAsync">
+    <RadzenStack Gap="1rem">
+        <div>
+            <RadzenText TextStyle="TextStyle.Subtitle2">Transaction identifier</RadzenText>
+            <RadzenTextBox Name="TransactionIdentifier" @bind-Value="request.TransactionIdentifier"
+                           Placeholder="Checkout reference or Direct Charge ID" Style="width: 100%" />
+            <RadzenRequiredValidator Component="TransactionIdentifier" Text="Enter a transaction reference or charge ID." />
+        </div>
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenText TextStyle="TextStyle.Subtitle2">Payment flow</RadzenText>
+                <RadzenDropDown Name="PaymentFlow" TValue="PayChanguPaymentFlow" Data="@paymentFlows"
+                                @bind-Value="request.PaymentFlow" Style="width: 100%" />
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenText TextStyle="TextStyle.Subtitle2">Payment method</RadzenText>
+                <RadzenDropDown Name="PaymentMethod" TValue="PayChanguPaymentMethod" Data="@paymentMethods"
+                                @bind-Value="request.PaymentMethod" Style="width: 100%" />
+            </RadzenColumn>
+        </RadzenRow>
+        <RadzenButton Text="Verify transaction" Icon="search" ButtonType="ButtonType.Submit" Disabled="@isLoading" />
+        @if (isLoading)
+        {
+            <RadzenStack AlignItems="AlignItems.Center" Gap="0.75rem" class="rz-p-4">
+                <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ShowValue="false" />
+                <RadzenText>Verifying transaction with PayChangu...</RadzenText>
+            </RadzenStack>
+        }
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger">@errorMessage</RadzenAlert>
+        }
+        @if (verification?.Result is { } data)
+        {
+            <RadzenDivider />
+            <RadzenStack Gap="0.5rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenText TextStyle="TextStyle.H6">Verification result</RadzenText>
+                    <RadzenBadge Text="@data.Status" />
+                </RadzenStack>
+                <RadzenText>Amount: @data.Currency @data.Amount.ToString("N2")</RadzenText>
+                <RadzenText>Transaction identifier: @data.TransactionIdentifier</RadzenText>
+                <RadzenText>Provider reference: @(data.ProviderReference ?? "—")</RadzenText>
+                <RadzenText>Payment flow: @data.PaymentFlow</RadzenText>
+                <RadzenText>Payment method: @data.PaymentMethod</RadzenText>
+                <RadzenText>Environment: @(data.Mode ?? "—")</RadzenText>
+                <RadzenText>Created: @(data.CreatedAt?.ToLocalTime().ToString("g") ?? "—")</RadzenText>
+                <RadzenText>Completed: @(data.CompletedAt?.ToLocalTime().ToString("g") ?? "—")</RadzenText>
+                @if (data.Customer is not null)
+                {
+                    <RadzenText>Customer: @($"{data.Customer.FirstName} {data.Customer.LastName}".Trim())</RadzenText>
+                    <RadzenText>Email: @(data.Customer.Email ?? "—")</RadzenText>
+                }
+            </RadzenStack>
+        }
+        <RadzenButton Text="Close" ButtonStyle="ButtonStyle.Light" ButtonType="ButtonType.Button" Click="@Close" />
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public string? InitialTransactionIdentifier { get; set; }
+    [Inject] private IPayChanguClient PayChanguClient { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
+
+    private readonly PayChanguPaymentFlow[] paymentFlows = [PayChanguPaymentFlow.Checkout, PayChanguPaymentFlow.DirectCharge];
+    private readonly PayChanguPaymentMethod[] paymentMethods = [PayChanguPaymentMethod.MobileMoney, PayChanguPaymentMethod.BankTransfer, PayChanguPaymentMethod.Card];
+    private readonly VerificationRequest request = new();
+    private PayChanguApiResponse<VerifyPaymentResponse>? verification;
+    private string? errorMessage;
+    private bool isLoading;
+
+    protected override void OnInitialized()
+    {
+        request.TransactionIdentifier = InitialTransactionIdentifier ?? string.Empty;
+    }
+
+    private async Task VerifyAsync(VerificationRequest model)
+    {
+        verification = null;
+        errorMessage = null;
+        isLoading = true;
+        try
+        {
+            verification = await PayChanguClient.Transactions.VerifyAsync(
+                model.TransactionIdentifier.Trim(), model.PaymentFlow, model.PaymentMethod);
+            if (!verification.Success || verification.Result is null)
+                errorMessage = verification.ErrorMessage ?? "PayChangu could not verify the transaction.";
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Unable to connect to PayChangu: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void Close() => DialogService.Close();
+
+    public sealed class VerificationRequest
+    {
+        public string TransactionIdentifier { get; set; } = string.Empty;
+        public PayChanguPaymentFlow PaymentFlow { get; set; } = PayChanguPaymentFlow.Checkout;
+        public PayChanguPaymentMethod PaymentMethod { get; set; } = PayChanguPaymentMethod.MobileMoney;
+    }
+}
